@@ -1,0 +1,192 @@
+#define SERVER_PORT  "4545"
+#define PACKET_HEADER_SIZE sizeof(transport_packet_header)
+#define PACKET_HEADER_STRING "altera"
+#define PACKET_HEADER_STRING_SIZE   (sizeof(PACKET_HEADER_STRING)-1)
+#define TIMER_CONSTANT 1
+
+
+/** 
+ * @ingroup CommandManager
+ * @brief Type of the command to be transfered.
+ */
+
+typedef enum
+{
+	TRANSFER_TYPE_POLL,		/**< Command will be polled from the server and the client will respond for the command whenever it receives poll command. */ 
+	TRANSFER_TYPE_SERVICE,  /**< Command will be registered in the server database and the client will respond to the command once it receives a sync command. */ 
+}Packet_Transfer_Type_Enum;
+
+
+/**
+ * @ingroup CommandManager
+ * @brief Tells the decoder in which module the operation to be performed.
+ */
+
+typedef enum
+{
+	HEPTA_MODULE_RRH=0x1, 			/**< Operation to be performed in the RRH module.*/
+	//HEPTA_MODULE_DFD, 				/**< Operation to be performed in the Design for debug module.*/
+	//HEPTA_MODULE_DFD_FIFO, 			/**< Operation to be performed in the pattern and capture buffer.*/
+	//HEPTA_MODULE_DDC, 				/**< Operation to be performed in the DDC module.*/
+	//HEPTA_MODULE_DUC, 				/**< Operation to be performed in the DUC module.*/
+	//HEPTA_MODULE_SGDMA,				/**< Operation to be performed in the SGDMA module.*/
+	//HEPTA_MODULE_RSSI,				/**< Operation to be performed in the RSSI module.*/
+	//HEPTA_MODULE_CFR,				/**< Operation to be performed in the CFR module.*/
+	//HEPTA_MODULE_DPD,				/**< Operation to be performed in the DPD module.*/
+	//HEPTA_MODULE_DPD_FIFO,			/**< Operation to be performed in the DPD_FIFO module.*/
+	//HEPTA_MODULE_JESD,				/**< Operation to be performed in the JESD module.*/
+	//HEPTA_MODULE_LMK,				/**< Operation to be performed in the LMK module.*/
+	//HEPTA_MODULE_DAC,				/**< Operation to be performed in the DAC module.*/
+	//HEPTA_MODULE_ADC,				/**< Operation to be performed in the ADC module.*/
+	//HEPTA_MODULE_SPI,				/**< Operation to be performed in the SPI module.*/
+	//HEPTA_MODULE_CPRI,				/**< Operation to be performed in the CPRI module.*/
+	//HEPTA_MODULE_FLEXMAPPER,		/**< Operation to be performed in the FLEXMAPPER module.*/
+	//HEPTA_MODULE_FLEXROUTER,		/**< Operation to be performed in the FLEXROUTER module.*/
+	HEPTA_MODULE_COMMAND_MANAGER, 	/**< To configure the Command Manager module.*/
+	HEPTA_MODULE_TOTAL=HEPTA_MODULE_COMMAND_MANAGER, /**< To get the total number of modules available.*/
+}hepta_module_type;
+
+
+/** 
+ * @ingroup CommandManager
+ * @brief Tells the decoder what to operation be performed.
+ */
+
+typedef enum
+{
+	HEPTA_PACKET_CMD_SET=0x1, 			/**< Write the data into memory.*/
+	HEPTA_PACKET_CMD_GET, 				/**< Read the data from memory.*/
+	HEPTA_PACKET_CMD_CONFIG, 			/**< Configuration messages to the application.*/
+	HEPTA_PACKET_CMD_EVENT,				/**< Operation to be performed in the CFR module.*/
+	HEPTA_PACKET_CMD_SERVICE,			/**< Service message for modules.*/
+	HEPTA_PACKET_ERROR, 				/**< Inform a error report to the server .*/
+	HEPTA_PACKET_ACK, 					/**< Acknowledge to an action to the server .*/
+	HEPTA_PACKET_MNG, 					/**< Command to manage the application.*/
+}Packet_Command_Type; 
+
+/** 
+ * @ingroup CommandManager
+ * @brief Actions to manage the running Hepta application.
+ */
+
+typedef enum
+{
+	HEPTA_MNG_CLOSE, 			/**< Command to close the application .*/
+	HEPTA_MNG_VERSION,			/**< Command to read version numbers for applications and drivers.*/
+}hepta_mng_command_action;
+
+/** 
+ * @ingroup SocketManager
+ * @brief Socket descpriptors.
+ */
+
+typedef struct
+{
+	int connectedfd 						/**< Descriptor for the connected socket for read and write. */,fdmax;
+	char * port_no;
+	char * pserver_ip_address;				/**< Server IPv4 address */
+}socket_handles;
+
+
+/** 
+ * @ingroup CommandManager
+ * @brief Command header that provides details about the operation
+ */
+
+typedef struct
+{
+	Packet_Transfer_Type_Enum		TransferType; 	/**< Type of the command. Polling, or service*/
+	hepta_command_packet_type		packet_type; 	/**< Operation to be performed*/
+	hepta_module_type				module_type;	/**< Module to be accessed*/
+	unsigned int					instant_num; 	/**< Instance number of the resource*/
+	unsigned int					address; 		/**< Offset from the base address of the resource*/
+	unsigned int					length; 		/**< Number of consecutive memory to be accessed in units of 32bits*/
+	unsigned char					reservd[8];
+	unsigned char					pData[0]; 		/**< Points to the memory which has the data*/
+}__attribute__((__packed__))Packet_Command_Header,*pPacket_Command_Header;
+
+
+/** 
+ * @ingroup SocketManager
+ * @brief Hepta packet header that provides details about the packet received/transmitted
+ */
+
+
+typedef struct
+{
+	unsgined char		header[6];		/**< Header of the packet transmitted/received*/
+	char				rsvd[2];
+	unsigned short		id; 			/**< unique number for each transaction, assigned by transport layer */
+	unsigned short		seq_num; 		/**< Sequence number of the packet incase of large data transfer*/
+	unsigned int		length; 		/**< Length of the packet transmitted/received*/
+	unsigned int		reservd[4];
+	char				pData[0]; 		/**< Points to the memory that has the hepta command header*/
+}__attribute__((__packed__))Transport_Packet_Header,*pTransport_Packet_Header;
+
+
+/** 
+ * @ingroup CommandManager
+ * @brief Link list to maintain the commands in the scheduler.
+ */
+
+
+typedef struct
+{
+	struct hepta_queue *Next;	/**< Pointer to the next element in queue.*/
+	hepta_handler pQueueData;	/**< Command of the current queue element.*/
+	hepta_u16 id;				/**< Id for the current command.*/
+}hepta_queue,*phepta_queue;
+
+
+/**
+ * @ingroup CommandManager
+ * @brief Link list Heads to maintain the commands in the scheduler.
+ */
+
+typedef struct
+{
+	pthread_mutex_t queue_lock;		/**< Mutex lock to synchronise queueing and dequeuing .*/
+	struct hepta_queue *Head;		/**< Pointer to the first command in the queue.*/
+	hepta_u8 queue_name;			/**< Name of the command queue.*/
+	hepta_u16 num_of_nodes;			/**< Number of command elements in the queue.*/
+}hepta_queue_head, *phepta_queue_head;
+
+
+/**
+ * @ingroup CommandManager
+ * @brief Event and Service structure.
+ */
+
+typedef struct
+{
+	hepta_u16 id;							/**< Command id for the service.*/
+	HeptaBoolean status;					/**< Service enable status.*/
+	HeptaTransferType transfer_type;		/**< Transfer type for the service.*/
+	hepta_command_packet_type packet_type;	/**< Packet type for the service.*/
+	unsigned int	send_count;					/**< Number of services processed for the service type.*/
+	bool			enable;					/**< Enable status of the service messages and response.*/
+}hepta_service,hepta_event,*phepta_service,*phepta_event;
+
+
+/**
+ * @ingroup CommandManager
+ * @ingroup SocketManager
+ * @brief Scheduler to maintain the firmware details.
+ */
+
+typedef struct
+{
+	hepta_queue_head        WriteQueueHead;					/**< Queue head for commands to be sent to server*/
+	hepta_queue_head        CommandQueueHead;				/**< Queue head for valid commands to be executed*/
+	pthread_t 		        pTransportReadThreadHandle; 	/**< Thread to perform write in the hardware modules*/
+	pthread_t 		        pTransportWriteThreadHandle; 	/**< Thread to perform read from the hardware modules*/
+	pthread_cond_t	        WriteThreadCondition;			/**< Condition signal to signal write thread*/
+	pthread_t 		        pCommandThreadHandle; 			/**< Thread to manage hardware modules*/
+	pthread_cond_t          CommandThreadCondition;			/**< Condition signal to signal command thread*/
+	pthread_cond_t	        condition_signal; 				/**< Condition to signal the read/write threads*/
+	pthread_mutex_t         lock; 							/**< Lock to synchronise the access to the fields in the scheduler header*/
+	bool			        is_thread;						/**< Condition to proceed to next iteration in threads*/
+	socket_handles			ServerClientDetails; 			/**< Heptaconnection handles to get server client details*/
+	volatile unsigned int *	ddrmemmapped;					/**< Virtual address for DDR3 memory*/
+	void *					device_handler_list[MODULE_COUNT_TOTAL];
+}hepta_socket_manager_header,*phepta_socket_manager_header;

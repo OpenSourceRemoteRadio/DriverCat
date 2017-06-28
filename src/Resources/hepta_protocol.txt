@@ -1,0 +1,337 @@
+/*
+Copyright (c) <2017>, Intel Corporation
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+    * Redistributions of source code must retain the above copyright notice,
+      this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+    * Neither the name of Intel Corporation nor the names of its contributors
+      may be used to endorse or promote products derived from this software
+      without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+*/
+
+/**
+ * @file hepta_protocol.h
+ * @brief Header file for the protocol.
+ */
+
+
+
+#ifndef HEPTA_PROTOCOL_H_
+#define HEPTA_PROTOCOL_H_
+
+#ifdef __cplusplus  
+extern "C"
+{
+#endif 
+
+#include <stdio.h>
+#include <stdint.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#define _GNU_SOURCE
+#define __USE_GNU
+#include <stdlib.h>
+#include <pthread.h>
+#include <sched.h>
+#include <string.h>
+#include <unistd.h>
+#include <errno.h>
+#include <sched.h>
+#include <stdbool.h>
+
+#include "hepta_datatype.h"
+
+#define SERVER_PORT  "4545"
+#define HEPTA_CMDMNGR_DATABASE_SIZE 32
+#define HEPTA_TCP_PACKET_SIZE sizeof(hepta_transport_pck_header)
+//#define HEPTA_PACKET_HEADER_SIZE sizeof(hepta_transport_pck_header)
+#define TCP_HEADER_STRING "altera"
+#define TCP_HEADER_SIZE   (sizeof(TCP_HEADER_STRING)-1)
+#define TIMER_CONSTANT 1
+
+
+
+/** 
+ * @ingroup CommandManager
+ * @brief Type of the command to be transfered.
+ */
+
+typedef enum
+{
+	HEPTA_ASYNC_POLL, /**< Command will be polled from the server and the client will respond for the command whenever it receives poll command. */ 
+	HEPTA_ASYNC_INTERRUPT, /**< Command will be sent from the server and the client will register the operation in the async database and responds periodically which trigers callback registered in the server. */ 
+	HEPTA_SYNC, /**< Command will be registered in the server database and the client will respond to the command once it receives a sync command. */ 
+}HeptaTransferType;
+
+
+/**
+ * @ingroup HandleManager
+ * @brief Tells the decoder in which module the operation to be performed.
+ */
+
+
+
+typedef enum
+{
+	HEPTA_MODULE_RRH=0x1, 			/**< Operation to be performed in the RRH module.*/
+	//HEPTA_MODULE_DFD, 				/**< Operation to be performed in the Design for debug module.*/
+	//HEPTA_MODULE_DFD_FIFO, 			/**< Operation to be performed in the pattern and capture buffer.*/
+	//HEPTA_MODULE_DDC, 				/**< Operation to be performed in the DDC module.*/
+	//HEPTA_MODULE_DUC, 				/**< Operation to be performed in the DUC module.*/
+	//HEPTA_MODULE_SGDMA,				/**< Operation to be performed in the SGDMA module.*/
+	//HEPTA_MODULE_RSSI,				/**< Operation to be performed in the RSSI module.*/
+	//HEPTA_MODULE_CFR,				/**< Operation to be performed in the CFR module.*/
+	//HEPTA_MODULE_DPD,				/**< Operation to be performed in the DPD module.*/
+	//HEPTA_MODULE_DPD_FIFO,			/**< Operation to be performed in the DPD_FIFO module.*/
+	//HEPTA_MODULE_JESD,				/**< Operation to be performed in the JESD module.*/
+	//HEPTA_MODULE_LMK,				/**< Operation to be performed in the LMK module.*/
+	//HEPTA_MODULE_DAC,				/**< Operation to be performed in the DAC module.*/
+	//HEPTA_MODULE_ADC,				/**< Operation to be performed in the ADC module.*/
+	//HEPTA_MODULE_SPI,				/**< Operation to be performed in the SPI module.*/
+	//HEPTA_MODULE_CPRI,				/**< Operation to be performed in the CPRI module.*/
+	//HEPTA_MODULE_FLEXMAPPER,		/**< Operation to be performed in the FLEXMAPPER module.*/
+	//HEPTA_MODULE_FLEXROUTER,		/**< Operation to be performed in the FLEXROUTER module.*/
+	HEPTA_MODULE_COMMAND_MANAGER, 	/**< To configure the Command Manager module.*/
+	HEPTA_MODULE_TOTAL=HEPTA_MODULE_COMMAND_MANAGER, /**< To get the total number of modules available.*/
+}hepta_module_type;
+
+
+/** 
+ * @ingroup CommandManager
+ * @brief Tells the decoder what to operation be performed.
+ */
+
+typedef enum
+{
+	HEPTA_PACKET_CMD_SET=0x1, 			/**< Write the data into memory.*/
+	HEPTA_PACKET_CMD_GET, 				/**< Read the data from memory.*/
+	HEPTA_PACKET_CMD_CONFIG, 			/**< Configuration messages to the application.*/
+	HEPTA_PACKET_CMD_EVENT,				/**< Operation to be performed in the CFR module.*/
+	HEPTA_PACKET_CMD_SERVICE,			/**< Service message for modules.*/
+	HEPTA_PACKET_ERROR, 				/**< Inform a error report to the server .*/
+	HEPTA_PACKET_ACK, 					/**< Acknowledge to an action to the server .*/
+	HEPTA_PACKET_MNG, 					/**< Command to manage the application.*/
+}hepta_command_packet_type; 
+
+/** 
+ * @ingroup CommandManager
+ * @brief Actions to manage the running Hepta application.
+ */
+
+typedef enum
+{
+	HEPTA_MNG_CLOSE, 			/**< Command to close the application .*/
+	HEPTA_MNG_VERSION,			/**< Command to read version numbers for applications and drivers.*/
+}hepta_mng_command_action;
+
+/** 
+ * @ingroup SocketManager
+ * @brief Socket descpriptors.
+ */
+
+typedef struct
+{
+	//fd_set read_fds,write_fds;
+	int sockfd,connectedfd 			/**< Descriptor for the connected socket for read and write. */,fdmax;
+	char * port_no;
+}hepta_socket_handles;
+
+/** 
+ * @ingroup CommandManager
+ * @brief Callback function pointer.
+ */
+
+typedef  void(*pCallbackFunction)(void *);
+
+
+/** 
+ * @ingroup CommandManager
+ * @brief Command header that provides details about the operation
+ */
+/** Command Header Structure */
+#ifndef ALIGNED_PACKET
+typedef struct
+{
+	HeptaTransferType		TransferType; /**< Type of the command. Polling, sync or async interrupt*/
+	hepta_command_packet_type packet_type; /**< Operation to be performed*/
+	hepta_module_type			module_type; /**< Module to be accessed*/
+	hepta_u32				instant_num; /**< Intance number of the resource*/
+	hepta_u32				address; /**< Offset from the base adress of teh resource*/
+	hepta_u32			length; /**< Number of consecutive memory to be accessed in units of 32bits*/
+	hepta_u8				reservd;
+	hepta_u8					pData[0]; /**< Points to the memory which has the data*/
+}__attribute__((__packed__))hepta_cmd_pck_header,*phepta_cmd_pck_header;
+#else
+typedef struct
+{
+	HeptaTransferType		TransferType; 	/**< Type of the command. Polling, sync or async interrupt*/
+	hepta_command_packet_type packet_type; 	/**< Operation to be performed*/
+	hepta_module_type			module_type;/**< Module to be accessed*/
+	hepta_u32				instant_num; 	/**< Instance number of the resource*/
+	hepta_u32				address; 		/**< Offset from the base address of the resource*/
+	hepta_u32			length; 			/**< Number of consecutive memory to be accessed in units of 32bits*/
+	hepta_u8				reservd[8];
+	hepta_u8					pData[0]; 	/**< Points to the memory which has the data*/
+}__attribute__((__packed__))hepta_cmd_pck_header,*phepta_cmd_pck_header;
+#endif
+
+
+/** 
+ * @ingroup SocketManager
+ * @brief Hepta packet header that provides details about the packet received/transmitted
+ */
+
+/** A Packet Structure useful in TCP transfers */
+#ifndef ALIGNED_PACKET
+typedef struct
+{
+	hepta_u8			header[6];  /**< Header of the packet transmitted/received*/
+	char            rsvd[2];
+	unsigned short  id; /**< unique number for each transaction, assigned by transport layer */
+	unsigned short  seq_num; /**< Sequence number of the packet incase of large data transfer*/
+	unsigned int    length; /**< Lenth of the packet transmitted/received*/
+	char            pData[0]; /**< Points to the memory that has the hepta command header*/
+}__attribute__((__packed__))hepta_transport_pck_header,*phepta_transport_pck_header;
+#else
+typedef struct
+{
+	hepta_u8			header[6];  /**< Header of the packet transmitted/received*/
+	char            rsvd[2];
+	unsigned short  id; 			/**< unique number for each transaction, assigned by transport layer */
+	unsigned short  seq_num; 		/**< Sequence number of the packet incase of large data transfer*/
+	unsigned int    length; 		/**< Length of the packet transmitted/received*/
+	unsigned int	reservd[4];
+	char            pData[0]; 		/**< Points to the memory that has the hepta command header*/
+}__attribute__((__packed__))hepta_transport_pck_header,*phepta_transport_pck_header;
+#endif
+
+
+/** 
+ * @ingroup CommandManager
+ * @brief Link list to maintain the commands in the scheduler.
+ */
+
+
+typedef struct
+{
+	struct hepta_queue *Next;	/**< Pointer to the next element in queue.*/
+	hepta_handler pQueueData;	/**< Command of the current queue element.*/
+	hepta_u16 id;				/**< Id for the current command.*/
+}hepta_queue,*phepta_queue;
+
+/**
+ * @ingroup CommandManager
+ * @brief Link list Heads to maintain the commands in the scheduler.
+ */
+
+typedef struct
+{
+	pthread_mutex_t queue_lock;		/**< Mutex lock to synchronise queueing and dequeuing .*/
+	struct hepta_queue *Head;		/**< Pointer to the first command in the queue.*/
+	hepta_u8 queue_name;			/**< Name of the command queue.*/
+	hepta_u16 num_of_nodes;			/**< Number of command elements in the queue.*/
+}hepta_queue_head, *phepta_queue_head;
+
+
+/**
+ * @ingroup CommandManager
+ * @brief Event and Service structure.
+ */
+
+typedef struct
+{
+	hepta_u16 id;							/**< Command id for the service.*/
+	HeptaBoolean status;					/**< Service enable status.*/
+	HeptaTransferType transfer_type;		/**< Transfer type for the service.*/
+	hepta_command_packet_type packet_type;	/**< Packet type for the service.*/
+	hepta_u32 send_count;					/**< Number of services processed for the service type.*/
+	HeptaBoolean enable;					/**< Enable status of the service messages and response.*/
+}hepta_service,hepta_event,*phepta_service,*phepta_event;
+
+
+/**
+ * @ingroup DFDApplication
+ * @brief Timer to measure performance.
+ */
+
+typedef struct
+{
+	hepta_u64 start_timer;			/**< Start time for performance measurement.*/
+	hepta_u64 end_timer;			/**< End time for performance measurement.*/
+}__attribute__((__packed__))hepta_timestamp;
+
+
+/**
+ * @ingroup DFDApplication
+ * @brief Time structure to measure performance.
+ */
+
+
+typedef struct
+{
+	int                time_hour;		/**< Hour metrics for time stamp.*/
+	int                time_minute;		/**< Minute metrics for time stamp.*/
+	int                time_seconds;	/**< Second metrics for time stamp.*/
+}hepta_time;
+
+/**
+ * @ingroup CommandManager
+ * @ingroup SocketManager
+ * @brief Scheduler to maintain the firmware details.
+ */
+
+typedef struct
+{
+	hepta_queue_head        WriteQueueHead;					/**< Queue head for commands to be sent to server*/
+	hepta_queue_head        CommandQueueHead;				/**< Queue head for valid commands to be executed*/
+	pthread_t 		        pTransportReadThreadHandle; 		/**< Thread to perform write in the hardware modules*/
+	pthread_t 		        pTransportWriteThreadHandle; 	/**< Thread to perform read from the hardware modules*/
+	pthread_cond_t	        WriteThreadCondition;			/**< Condition signal to signal write thread*/
+	pthread_t 		        pCommandThreadHandle; 			/**< Thread to manage hardware modules*/
+	pthread_cond_t          CommandThreadCondition;			/**< Condition signal to signal command thread*/
+	pthread_cond_t	        condition_signal; 				/**< Condition to signal the read/write threads*/
+	pthread_mutex_t         lock; 							/**< Lock to synchronise the access to the fields in the scheduler header*/
+	bool			        is_thread;						/**< Condition to proceed to next iteration in threads*/
+	hepta_socket_handles	ServerClientDetails; 		/**< Heptaconnection handles to get server client details*/
+	int 			        close_connections; 				/**< Variable to get the status of connection. Set to define an active server client connection*/
+	phepta_bus_address      ddrmemmapped;					/**< Virtual address for DDR3 memory*/
+	hepta_u32		        test_vector_size;  		   		/**< total size of the test vector */
+	char *                  pserver_ip_address;				/**< Server IPv4 address */
+	void *					hepta_lime_rf_device_list[HEPTA_MODULE_TOTAL];
+}hepta_socket_manager_header,*phepta_socket_manager_header;
+
+
+
+extern char server_ip_address[15]; /**< Server IP address. */
+extern void * hepta_transport_read_thread(void *ptr);
+extern void * hepta_transport_write_thread(void *ptr);
+extern void * hepta_command_thread(void *ptr);
+extern hepta_status hepta_tcp_create_client(char* port_no,phepta_socket_manager_header pSch_header,char *ip);
+extern phepta_transport_pck_header hepta_tcp_read(phepta_socket_manager_header pSch_header,hepta_socket_handles *pConnectionDetails);
+extern void hepta_tcp_write(hepta_socket_handles *pConnectionDetails,phepta_transport_pck_header pTcpPacket);
+extern void hepta_tcpClient_socket_close(phepta_socket_manager_header pSch_header);
+extern int hepta_queue_append(phepta_queue_head pHead,void *data, int id);
+hepta_status hepta_init_queue(phepta_queue_head queue);
+
+
+#ifdef __cplusplus
+}/* close the extern "C" { */
+#endif 
+
+#endif 

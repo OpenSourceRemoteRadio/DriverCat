@@ -1,0 +1,50 @@
+#!/bin/bash
+PWD=$(pwd)
+COMPILE_REPORT_FILE="Report.txt"
+GCC_ROOT_DIRECTORY="Enter GCC 3.8 root directory"
+KERNEL_SOURCE_ROOT_DIR="Enter Linux 3.10 Kernel Root directory"
+
+TODAY=$(date)
+HOST=$(hostname)
+USER_NAME=$(id -u -n)
+
+COMPILATION_PASS=1
+COMPILATION_FAILURE=0
+
+Driver_Compile()
+{
+	echo -e -n "Compiling "$2" in "$1"\n"
+
+	(cd $1 && make clean ARCH=arm CROSS_COMPILE=$GCC_ROOT_DIRECTORY/gcc-linaro-arm-linux-gnueabihf-4.8-2013.12_linux/bin/arm-linux-gnueabihf- KDIR=$KERNEL_SOURCE_ROOT_DIR)
+
+        (cd $1 && make ARCH=arm CROSS_COMPILE=$GCC_ROOT_DIRECTORY/gcc-linaro-arm-linux-gnueabihf-4.8-2013.12_linux/bin/arm-linux-gnueabihf- KDIR=$KERNEL_SOURCE_ROOT_DIR 1> no-error.log 2> errors.log)
+
+	chmod +x * -R
+	COMPILE_ERROR=$(cat $1"errors.log" | grep error)
+	
+	if [ -n "$COMPILE_ERROR" ]; then
+		echo -e -n $2" Compilation failed\nError :\n" >> $COMPILE_REPORT_FILE
+		echo $COMPILE_ERROR >> $COMPILE_REPORT_FILE
+		return $COMPILATION_FAILURE
+	else
+		echo -e -n $2" Compilation passed\n" >> $COMPILE_REPORT_FILE
+		if [ ! -d ./"out" ];then
+			(mkdir out)
+		fi
+		
+		cp $3 out
+		cp $3 $ROOTFS_DIR/home/root
+		return $COMPILATION_PASS
+	fi
+}
+
+if [[ $EUID -ne 0 ]]; then
+	echo -e -n $USER_NAME", This script must be run as root\n" 1>&2
+	echo -e -n "Exiting...\n"
+   exit 1
+fi
+
+echo -e -n "-----------------------------------------------------\n" >> $COMPILE_REPORT_FILE
+echo -e -n $TODAY $HOST $USER_NAME"\n" >> $COMPILE_REPORT_FILE
+echo -e -n "-----------------------------------------------------\n" >> $COMPILE_REPORT_FILE
+

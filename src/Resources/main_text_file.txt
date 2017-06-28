@@ -1,0 +1,194 @@
+#define APP_VERSION "0.0.1"
+int DebugLevel=DEBUG_LEVEL_ERROR;
+
+/**
+ * @brief Handler for signal from terminal or other application.
+ * @param signal_number Number representing the signal from the terminal.
+ */
+void project_name_signal_handler(int signal_number)
+{
+	printf("Received signal %d\n",signal_number);
+	int server_index = 0;
+	struct timespec join_timeout;
+	int return_int;
+
+	if(project_name_socket_manager.number_of_server !=0)
+	{
+		project_name_socket_manager.is_thread = false;
+		sleep(1);
+		printf("Thread Run %d\n",project_name_socket_manager.is_thread );
+		for (server_index = 0; server_index < project_name_socket_manager.number_of_server; ++server_index) {
+			tcpClient_socket_close((project_name_socket_manager.ServerClientDetails) + server_index);
+		}
+
+		join_timeout.tv_nsec = 0;
+		join_timeout.tv_sec = 1;
+
+
+		while(1)
+		{
+			if(pthread_timedjoin_np(project_name_socket_manager.pCommandThreadHandle,NULL,&join_timeout)==0)
+			{
+				break;
+			}
+			else
+			{
+				pthread_mutex_lock(&project_name_socket_manager.lock);
+				pthread_cond_signal(&project_name_socket_manager.CommandThreadCondition);
+				pthread_mutex_unlock(&project_name_socket_manager.lock);
+			}
+		}
+
+		printf("Command thread joined\n");
+
+		while(1)
+		{
+			if(pthread_timedjoin_np(project_name_socket_manager.pTransportWriteThreadHandle,NULL,&join_timeout)==0)
+			{
+				break;
+			}
+			else
+			{
+				pthread_mutex_lock(&project_name_socket_manager.lock);
+				pthread_cond_signal(&project_name_socket_manager.WriteThreadCondition);
+				pthread_mutex_unlock(&project_name_socket_manager.lock);
+			}
+		}
+
+		printf("Write thread joined\n");
+
+		join_timeout.tv_sec = 5;
+
+		for (server_index = 0; server_index < project_name_socket_manager.number_of_server; ++server_index) {
+					return_int = pthread_timedjoin_np(project_name_socket_manager.pServerConnectThreadHandle[server_index],NULL,&join_timeout);
+					printf("Joined server create %d %d\n",server_index,return_int);
+				}
+
+		printf("Server create thread joined\n");
+
+	}
+	exit(0);
+
+}
+
+int main(int argc,char **argv)
+{
+
+	unsigned int arg_index=0;
+	char port_number[5];
+	char server_ip_address[15];
+	bool server_connect = false;
+    bool init = false;
+
+	sscanf(SERVER_PORT,"%s",port_number);
+    signal(SIGINT,project_name_signal_handler);
+
+	while(arg_index < argc)
+	{
+		if(strcmp("--version",argv[arg_index])==0)
+		{
+			printf("Version %s\nCopyright (C) ALTERA\n",APP_VERSION);
+			return 0;
+		}
+		if(strcmp("--help",argv[arg_index])==0)
+		{
+			printf("Usage: exe\n   or: \
+					exe [OPTION]\nDescription\n\tRuns the Client application\n\nOptions\n \
+					 --version					\tSee the software version of the application\n\
+					 --server \"IP_address\"	\tConnects to the MATLAB server\n\
+					 --debug [0-5]				\tCustomizes debug messages\n\
+					 --port  \"port_number\"	\tCustomizes port number to connect to server\n\
+                     --init  					\tInitialises FPGA registers\n");
+			return 0;
+		}
+		if(strcmp("--debug",argv[arg_index])==0)
+		{
+			DEBUG_PRINT(DEBUG_LEVEL_ERROR,("Setting Debug Level \n"));
+			arg_index++;
+			sscanf(argv[arg_index],"%d",&DebugLevel);
+			if(DebugLevel>DEBUG_LEVEL_ERROR || DebugLevel<DEBUG_LEVEL_ALL)
+			{
+				DEBUG_PRINT(DEBUG_LEVEL_ERROR,("Debug Level should be between %d to %d \n",DEBUG_LEVEL_ERROR,DEBUG_LEVEL_ALL));
+				DEBUG_PRINT(DEBUG_LEVEL_ERROR,("setting Debug Level to default DEBUG_LEVEL_ERROR(%d) \n",DEBUG_LEVEL_ERROR));
+				DebugLevel=DEBUG_LEVEL_ERROR;
+			}
+		}
+		if(strcmp("--port",argv[arg_index])==0)
+		{
+			if(project_name_socket_manager.number_of_server != 0)
+			{
+				DEBUG_PRINT(DEBUG_LEVEL_ERROR,("Setting connection port for %s\n",\
+						project_name_socket_manager.ServerClientDetails[project_name_socket_manager.number_of_server-1].pserver_ip_address));
+			arg_index++;
+			sscanf(argv[arg_index],"%s",port_number);
+			DEBUG_PRINT(DEBUG_LEVEL_ERROR,("Port address --> %s\n",port_number));
+				project_name_socket_manager.ServerClientDetails[project_name_socket_manager.number_of_server-1].port_no = strdup(port_number);
+			}
+			else
+			{
+				DEBUG_PRINT(DEBUG_LEVEL_ERROR,("No server address defined for port definition\nUse --server for defining server address\n"));
+			}
+		}
+
+		if(strcmp("--server",argv[arg_index])==0)
+		{
+			if(project_name_socket_manager.number_of_server < MAX_SERVER_COUNT)
+			{
+			DEBUG_PRINT(DEBUG_LEVEL_ERROR,("Setting server IP address\nWaits for Server connection\n"));
+			arg_index++;
+			sscanf(argv[arg_index],"%s",server_ip_address);
+			if(isValidIp4(server_ip_address)!=0)
+			{
+				DEBUG_PRINT(DEBUG_LEVEL_ERROR,("Server address --> %s\n",server_ip_address));
+				server_connect = true;
+
+					project_name_socket_manager.ServerClientDetails[project_name_socket_manager.number_of_server].pserver_ip_address = strdup(server_ip_address);
+					project_name_socket_manager.ServerClientDetails[project_name_socket_manager.number_of_server].port_no = strdup(SERVER_PORT);
+					project_name_socket_manager.ServerClientDetails[project_name_socket_manager.number_of_server].connected = false;
+					project_name_socket_manager.ServerClientDetails[project_name_socket_manager.number_of_server].connecting = false;
+					project_name_socket_manager.ServerClientDetails[project_name_socket_manager.number_of_server].reading = false;
+					project_name_socket_manager.ServerClientDetails[project_name_socket_manager.number_of_server].connectedfd = -1;
+					project_name_socket_manager.number_of_server++;
+			}
+			else
+			{
+				DEBUG_PRINT(DEBUG_LEVEL_ERROR,("Incorrect server address --> %s\n",server_ip_address));
+					//server_connect = false;
+				}
+			}
+			else
+			{
+				DEBUG_PRINT(DEBUG_LEVEL_ERROR,("Maximum servers exceeded. Maximum allowed server connection is %d\n",MAX_SERVER_COUNT));
+			}
+		}
+        if(strcmp("--init",argv[arg_index])==0)
+		{
+			init = true;
+		}
+
+		arg_index++;
+	}
+
+    if(init)
+	{
+		//project_name_init(); //Create project_name_init and uncomment this function call
+		printf("Initialising and Exiting Application\n");
+		return 0;
+	}
+
+    if(server_connect)
+	{
+		socket_manager_init(&SOCKET_MANAGER_VARIABLE_NAME);
+	}
+	else
+	{
+		DEBUG_PRINT(DEBUG_LEVEL_ERROR,("Running in standalone mode\n"));
+	}
+
+	if(server_connect)
+	{
+		while(1);
+	}
+
+	return 0;
+}

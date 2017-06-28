@@ -1,0 +1,17 @@
+typedef struct
+{
+    unsigned int Transfer_Type:1;    /**< This field specifies whether command is polling or service type. */
+    unsigned int Module_Index:7;    /**< Index of module to configure.  Maximum 128 modules can be configured*/
+    unsigned int Operation_Type:4;    /**< Operation to be performed e.g Read, Write and Config. Supports maximum 16 operations.*/
+    unsigned int Instance:4;    /**< Instance of module to configure.  Maximum 16 instances of each modules can be configured*/
+    unsigned int Resource:8;    /**< Index of the resource to be accessed*/
+    unsigned short Address;    /**< Offset address or index of configuration to be done. Maximum 65536 address/offsets can be configured*/
+    unsigned int Bit_Mask;    /**< To mask resgiter data during write and read*/
+    //unsigned short Length;    /**< Number of data offsets succeeding command header.  Maximum 65536 words of data transfer supported*/
+	unsigned int Length:22;    /**< Number of data offsets succeeding command header.  Maximum 65536 words of data transfer supported*/
+	//char reserved[3];
+    unsigned int is_CPRI_CM:1;		/**<Decides if it is C&M packet*/
+    unsigned int server_index:1;
+    unsigned int reserved:24;
+    char pData[0];    			/**< Points to the memory that has data*/
+}__attribute__((__packed__))Command_Header,*pCommand_Header;

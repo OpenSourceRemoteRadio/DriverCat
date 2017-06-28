@@ -1,0 +1,8 @@
+typedef struct
+{
+    char Header_String[3];    /**< This is the first field of Ethernet Packet. Incoming packets will be checked for this string*/
+    unsigned int Id:8;    /**< Unique Id for each incomming command. Supports 256 commands simultaenously.*/
+    unsigned int Length;    /**< Number of bytes succeeding header. This includes Command and data.  Maximum 65536 bytes of command and data transfer possible*/
+	unsigned char server_index;
+    char pData[0];    /**< Points to the memory that has command header*/
+}__attribute__((__packed__))Packet_Header,*pPacket_Header;

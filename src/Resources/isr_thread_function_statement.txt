@@ -1,0 +1,38 @@
+pdevice_handler pmodule_name_handler = (pdevice_handler)module_name_handler_ptr;
+
+int uio_fd;
+char number[4];
+char device_node[256];
+unsigned int no_of_interrupts_triggered = 0;
+unsigned char ret;
+
+memset(device_node,0,256);	//erase device_node
+sprintf(device_node,"/dev/uio%d",pmodule_name_handler->uio_irq_device_number);
+
+uio_fd = open(device_node,O_RDONLY);
+
+if(uio_fd <= 0)
+{
+	return NULL;
+}
+
+while(1)
+{
+	ret = read(uio_fd,number,4);
+	DEBUG_PRINT(DEBUG_LEVEL_INFO,("module_name %s Interrupt received\n",pmodule_name_handler->device_instance_number));
+	number[ret-1]='\0';
+	no_of_interrupts_triggered=atoi(number);
+	
+	if(pmodule_name_handler->ISR_callback_function_ptr != NULL)
+	{
+		pmodule_name_handler->ISR_callback_function_ptr(pmodule_name_handler,pmodule_name_handler->ISR_callback_argument);
+	}
+	else
+	{	
+		break;
+	}
+}
+
+close(uio_fd);
+
+return NULL;

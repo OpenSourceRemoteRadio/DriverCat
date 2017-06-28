@@ -1,0 +1,233 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <!-- 
+    Microsoft ResX Schema 
+    
+    Version 2.0
+    
+    The primary goals of this format is to allow a simple XML format 
+    that is mostly human readable. The generation and parsing of the 
+    various data types are done through the TypeConverter classes 
+    associated with the data types.
+    
+    Example:
+    
+    ... ado.net/XML headers & schema ...
+    <resheader name="resmimetype">text/microsoft-resx</resheader>
+    <resheader name="version">2.0</resheader>
+    <resheader name="reader">System.Resources.ResXResourceReader, System.Windows.Forms, ...</resheader>
+    <resheader name="writer">System.Resources.ResXResourceWriter, System.Windows.Forms, ...</resheader>
+    <data name="Name1"><value>this is my long string</value><comment>this is a comment</comment></data>
+    <data name="Color1" type="System.Drawing.Color, System.Drawing">Blue</data>
+    <data name="Bitmap1" mimetype="application/x-microsoft.net.object.binary.base64">
+        <value>[base64 mime encoded serialized .NET Framework object]</value>
+    </data>
+    <data name="Icon1" type="System.Drawing.Icon, System.Drawing" mimetype="application/x-microsoft.net.object.bytearray.base64">
+        <value>[base64 mime encoded string representing a byte array form of the .NET Framework object]</value>
+        <comment>This is a comment</comment>
+    </data>
+                
+    There are any number of "resheader" rows that contain simple 
+    name/value pairs.
+    
+    Each data row contains a name, and value. The row also contains a 
+    type or mimetype. Type corresponds to a .NET class that support 
+    text/value conversion through the TypeConverter architecture. 
+    Classes that don't support this are serialized and stored with the 
+    mimetype set.
+    
+    The mimetype is used for serialized objects, and tells the 
+    ResXResourceReader how to depersist the object. This is currently not 
+    extensible. For a given mimetype the value must be set accordingly:
+    
+    Note - application/x-microsoft.net.object.binary.base64 is the format 
+    that the ResXResourceWriter will generate, however the reader can 
+    read any of the formats listed below.
+    
+    mimetype: application/x-microsoft.net.object.binary.base64
+    value   : The object must be serialized with 
+            : System.Runtime.Serialization.Formatters.Binary.BinaryFormatter
+            : and then encoded with base64 encoding.
+    
+    mimetype: application/x-microsoft.net.object.soap.base64
+    value   : The object must be serialized with 
+            : System.Runtime.Serialization.Formatters.Soap.SoapFormatter
+            : and then encoded with base64 encoding.
+
+    mimetype: application/x-microsoft.net.object.bytearray.base64
+    value   : The object must be serialized into a byte array 
+            : using a System.ComponentModel.TypeConverter
+            : and then encoded with base64 encoding.
+    -->
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="Driver_Code_Folder_Name" xml:space="preserve">
+    <value>drv</value>
+    <comment>Folder name for genereated driver code</comment>
+  </data>
+  <assembly alias="System.Windows.Forms" name="System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089" />
+  <data name="Intel_Logo" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\images\BigCat_Logo_Uniform_1920.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="Status_Bar_Ready" xml:space="preserve">
+    <value>Status : Ready</value>
+    <comment>String in the status bar to show ready</comment>
+  </data>
+  <data name="Status_Bar_Busy" xml:space="preserve">
+    <value>Status : Busy</value>
+    <comment>String in the status bar to show busy</comment>
+  </data>
+  <data name="Company_Name" xml:space="preserve">
+    <value>Intel</value>
+    <comment>Name of the company that owns the code</comment>
+  </data>
+  <data name="Light_Weight_Base_Address" xml:space="preserve">
+    <value>ff200000</value>
+    <comment>Base address of Light Weight Bridge</comment>
+  </data>
+  <data name="Project_Name" xml:space="preserve">
+    <value>HEPTA</value>
+    <comment>Name of the project</comment>
+  </data>
+  <data name="Reg_Map_Array_Typedef" xml:space="preserve">
+    <value>Hepta_Reg_Map</value>
+    <comment>Typedef type that defines the register map</comment>
+  </data>
+  <data name="Company_Site" xml:space="preserve">
+    <value>www.intel.com</value>
+    <comment>Site URL</comment>
+  </data>
+  <data name="DTS_File_Name" xml:space="preserve">
+    <value>soc_fpga.dts</value>
+    <comment>Name of the dts file</comment>
+  </data>
+  <data name="DTS_search_string_to_replace" xml:space="preserve">
+    <value>hepta_modeule_list_to_be_added</value>
+    <comment>Search string where the module list to be updated in the dts file</comment>
+  </data>
+  <data name="Include_Header_Code_Folder_Name" xml:space="preserve">
+    <value>inc</value>
+    <comment>Folder name for header files and dts file</comment>
+  </data>
+  <data name="Feedback_Mail_Id" xml:space="preserve">
+    <value>cat@bigcatwireless.com</value>
+    <comment>Mail ID for feedback</comment>
+  </data>
+  <data name="BigCatIcon" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\images\BigCatIcon.ico;System.Drawing.Icon, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="Bit_Configuration_Heading" xml:space="preserve">
+    <value>Bit Configuration:</value>
+    <comment>Heading for the bit configuration in cell comment</comment>
+  </data>
+  <data name="Register_Definition_Table_Name" xml:space="preserve">
+    <value>_Register_Definition_Table</value>
+    <comment>Name of the Table in Excel sheet that has register definition</comment>
+  </data>
+  <data name="Bit_Description_Heading" xml:space="preserve">
+    <value>Bit Description:</value>
+    <comment>Heading for the bit description in cell comment</comment>
+  </data>
+  <data name="device_handler_function" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\device_handler_function.txt;System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089;Windows-1252</value>
+  </data>
+  <data name="Makefile" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\Makefile.txt;System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089;Windows-1252</value>
+  </data>
+  <data name="main_text_file" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\main_text_file.txt;System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089;Windows-1252</value>
+  </data>
+  <data name="firmware_header_content" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\firmware_header_content.txt;System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089;Windows-1252</value>
+  </data>
+  <data name="protocol_header_context" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\protocol_header_context.txt;System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089;Windows-1252</value>
+  </data>
+  <data name="tcp_client_file_content" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\tcp_client_file_content.txt;System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089;Windows-1252</value>
+  </data>
+  <data name="driver_header_content" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\driver_header_content.txt;System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089;Windows-1252</value>
+  </data>
+  <data name="Driver_Probe_Function_Content" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\Driver_Probe_Function_Content.txt;System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089;Windows-1252</value>
+  </data>
+  <data name="Driver_Remove_Function_Content" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\Driver_Remove_Function_Content.txt;System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089;Windows-1252</value>
+  </data>
+  <data name="Driver_Compile_Script_Content" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\Driver_Compile_Script_Content.txt;System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089;Windows-1252</value>
+  </data>
+  <data name="Bit_Permission_Heading" xml:space="preserve">
+    <value>Bit Permission:</value>
+    <comment>Heading for the bit permission in cell comment</comment>
+  </data>
+  <data name="Command_Header_Structure_Text" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\Command_Header_Structure_Text.txt;System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089;Windows-1252</value>
+  </data>
+  <data name="Packet_Header_Structure_Text" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\Packet_Header_Structure_Text.txt;System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089;Windows-1252</value>
+  </data>
+  <data name="isr_register_function_statement" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\isr_register_function_statement.txt;System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089;Windows-1252</value>
+  </data>
+  <data name="isr_thread_function_statement" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\isr_thread_function_statement.txt;System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089;Windows-1252</value>
+  </data>
+</root>

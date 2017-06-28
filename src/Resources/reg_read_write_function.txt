@@ -1,0 +1,97 @@
+/*
+Copyright (c) <2017>, Intel Corporation
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+    * Redistributions of source code must retain the above copyright notice,
+      this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+    * Neither the name of Intel Corporation nor the names of its contributors
+      may be used to endorse or promote products derived from this software
+      without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+*/
+
+void hepta_module_name_reg_read(phepta_cmd_pck_header pCmdHeader,hepta_u16 packet_id)
+{
+	int read_count;
+	phepta_device_handler pdev=hepta_module_name_get_handler(pCmdHeader->instant_num);
+	hepta_u32 Length = pCmdHeader->length;
+	phepta_u32 pData = (phepta_u32)pCmdHeader->pData;
+	hepta_u32 offset = pCmdHeader->address;
+	
+	if(pdev!=NULL)
+	{
+		for(read_count=0;read_count<Length;read_count++)
+		{
+			pData[read_count] = pdev->reg_remap_addr[offset+read_count];
+		}
+		return;
+	}
+}
+
+
+
+void hepta_module_name_reg_write(phepta_cmd_pck_header pCmdHeader,hepta_u16 packet_id)
+{
+	int write_count;
+	phepta_device_handler pdev=hepta_module_name_get_handler(pCmdHeader->instant_num);
+	hepta_u32 Length = pCmdHeader->length;
+	phepta_u32 pData = (phepta_u32)pCmdHeader->pData;
+	hepta_u32 offset = pCmdHeader->address;
+	
+	if(pdev!=NULL)
+	{
+		for(write_count=0;write_count<Length;write_count++)
+		{
+			pdev->reg_remap_addr[offset+write_count] = pData[write_count];
+		}
+		return;
+	}
+}
+
+
+void hepta_module_name_reg_read_api(hepta_u32 instant_num,hepta_u32 offset,hepta_u32 Length,phepta_u32 pData)
+{
+	int read_count;
+	phepta_device_handler pdev=hepta_module_name_get_handler(instant_num);
+
+	if(pdev!=NULL)
+	{
+		for(read_count=0;read_count<Length;read_count++)
+		{
+			pData[read_count] = pdev->reg_remap_addr[offset+read_count];
+		}
+		return;
+	}
+}
+
+
+
+void hepta_module_name_reg_write_api(hepta_u32 instant_num,hepta_u32 offset,hepta_u32 Length,phepta_u32 pData)
+{
+	int write_count;
+	phepta_device_handler pdev=hepta_module_name_get_handler(instant_num);
+
+	if(pdev!=NULL)
+	{
+		for(write_count=0;write_count<Length;write_count++)
+		{
+			pdev->reg_remap_addr[offset+write_count] = pData[write_count];
+		}
+		return;
+	}
+}

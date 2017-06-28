@@ -1,0 +1,7 @@
+pdevice_handler pmodule_name_handler = (pdevice_handler)module_name_handler_ptr;
+if(pmodule_name_handler->uio_irq_device_number >=0 )
+{
+	pmodule_name_handler->ISR_callback_function_ptr = callback_function;
+	pmodule_name_handler->ISR_callback_argument = callback_argument;
+	pthread_create(&(pmodule_name_handler->ISR_thread_handler),NULL, project_name_module_name_isr_thread,pmodule_name_handler);
+}

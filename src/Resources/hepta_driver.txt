@@ -1,0 +1,176 @@
+/*
+Copyright (c) <2017>, Intel Corporation
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+    * Redistributions of source code must retain the above copyright notice,
+      this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+    * Neither the name of Intel Corporation nor the names of its contributors
+      may be used to endorse or promote products derived from this software
+      without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+*/
+
+/**
+* @file hepta_driver.h
+* @brief Header file for Hepta drivers.
+*/
+
+
+#ifndef HEPTA_DRIVER_H
+#define HEPTA_DRIVER_H
+
+#ifdef KERNEL
+#include <linux/proc_fs.h> /* proc file system*/
+#endif
+
+#include "hepta_datatype.h"
+
+#define HEPTA_GET_NUM_RESOURCE _IOR('b',0,Hepta32U *)
+#define HEPTA_GET_RESOURCES _IOR('b',1,Physical_resource *)
+#define HEPTA_SET_REGISTERS _IOW('b',2,RdWrParameter *)
+#define HEPTA_GET_REGISTERS  _IOR('b',3,RdWrParameter *)
+#define HEPTA_SET_FIFO _IOW('b',4,RdWrParameter *)
+#define HEPTA_GET_FIFO _IOR('b',5,RdWrParameter *)
+#define HEPTA_GET_DDR3_PHYSICAL _IOR('b',6,RdWrParameter *)
+#define HEPTA_TRANSFER_HPS_FPGA _IOW('b',7,RdWrParameter *)
+#define HEPTA_TRANSFER_FPGA_HPS _IOW('b',8,RdWrParameter *)
+#define HEPTA_PRINT_DMA_MEMORY _IOW('b',9,RdWrParameter *)
+#define HEPTA_INTERRUPT _IOR('b',10,Hepta32U *)
+#define HEPTA_INTERRUPT_LOCK _IOR('b',11,Hepta32U *)
+#define HEPTA_INTERRUPT_UNLOCK _IOR('b',12,Hepta32U *)
+#define HEPTA_INTERRUPT_ENABLE _IOR('b',13,Hepta32U *)
+#define HEPTA_INTERRUPT_DISABLE _IOR('b',14,Hepta32U *)
+
+
+
+
+
+struct proc_dir_entry *get_next_proc_byname(char *name,struct proc_dir_entry *parent);
+Hepta8U get_proc_instance(struct proc_dir_entry *proc_duc);
+void hepta_remove_proc_in_dir(struct proc_dir_entry *parent);
+
+
+#define HPS_DDR3_MEM_START 0x20000000
+#define HPS_DDR3_MEM_SIZE  0x20000000
+
+
+/**
+* @brief Parameter structure for IOCTL read and write.
+*/
+
+typedef struct
+{
+	Hepta32U address; /**< Address or offset from the base address to be accessed. */ 
+	Hepta32U length; /**< Number of successive memory to be accessed in units of 32 bits. */ 
+	Hepta32U instance; /**< Instance number of the memory to be accessed. */ 
+	Hepta8U pData[0]; /**< Memory to hold the data to write into the memory or read from the memory. */ 
+}RdWrParameter;
+
+typedef struct
+{
+	pHeptaBusAddr start_address;
+	Hepta32U size_in_bytes;
+}__attribute__((__packed__))Physical_resource;
+
+
+
+/**
+* @brief Get the pointer to the proc_dir_entry struct with the specified name in the parent directory 
+* @param name Name of the proc entry
+* @param parent Pointer to the parent proc directory
+* @return Returns the pointer to the proc_dir_entry structure that is registered with the specified name
+*/
+
+struct proc_dir_entry *get_next_proc_byname(char *name,struct proc_dir_entry *parent)
+{
+	struct proc_dir_entry *proc_entry;
+	if(parent->subdir == NULL)
+		return NULL;
+	proc_entry=parent->subdir;
+	while(1)
+	{
+		if(strcmp(proc_entry->name,name)==0)
+			return proc_entry;
+		if(proc_entry->next!=NULL)
+		{
+			proc_entry=proc_entry->next;
+		}
+		else
+			return NULL;			
+	}
+	return NULL;
+}
+
+/**
+* @brief Get the pointer to the parent directory /proc/[module] and searches all the instances and returns the lease instance number available.
+* @param parent Pointer to the parent proc directory
+* @return Returns the instance number that is not allocated to any device instance
+*/
+
+Hepta8U get_proc_instance(struct proc_dir_entry *parent)
+{
+	struct proc_dir_entry *proc_entry;
+	Hepta8U avail_instance[2]={'0','\0'};
+	
+	if(parent->subdir == NULL){
+		return avail_instance[0];
+	}else{
+		proc_entry=parent->subdir;
+		for(avail_instance[0]='0';;avail_instance[0]++)
+		{
+			while(1)
+			{
+				if(strcmp(proc_entry->name,(char *)&avail_instance)==0)
+				{
+					proc_entry=parent->subdir;
+					break;
+				}
+				if(proc_entry->next!=NULL)
+				{
+					proc_entry=proc_entry->next;
+				}
+				else
+				{
+					return avail_instance[0];
+				}
+			}
+		}
+
+	}
+	return avail_instance[0];
+}
+
+/**
+* @brief Get the pointer to the parent directory and removes all the entries in the directory
+* @param parent Pointer to the parent proc directory
+*/
+
+void hepta_remove_proc_in_dir(struct proc_dir_entry *parent)
+{
+	struct proc_dir_entry *proc_entry;
+    if(parent->subdir == NULL)
+		return;
+    do
+    {
+        proc_entry=parent->subdir; 
+        remove_proc_entry(proc_entry->name,proc_entry->parent);
+    }while(parent->subdir!=NULL);
+    return;
+}
+
+#endif //end of HEPTA_DRIVER_H

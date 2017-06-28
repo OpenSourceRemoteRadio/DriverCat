@@ -1,0 +1,169 @@
+/*
+Copyright (c) <2017>, Intel Corporation
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+    * Redistributions of source code must retain the above copyright notice,
+      this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+    * Neither the name of Intel Corporation nor the names of its contributors
+      may be used to endorse or promote products derived from this software
+      without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+*/
+
+* @file hepta_firmware.h
+* @brief Header file for the Hepta firmware.
+*/
+
+#ifndef HEPTA_FIRMWARE_H_
+#define HEPTA_FIRMWARE_H_
+
+
+#ifdef __cplusplus  
+extern "C"
+{
+#endif 
+#include "hepta_datatype.h"
+#include "hepta_protocol.h"
+
+
+#ifdef DEBUG
+#define HEPTA_DEBUG(fmt,args...) printf("%s:%s:%d: "fmt, __FILE__, __FUNCTION__, __LINE__, args)
+#else
+#define HEPTA_DEBUG(fmt,args...) do{}while(0);
+#endif
+
+#define HEPTA_ERROR(fmt,args...) printf("%s:%s:%d: error :"fmt, __FILE__, __FUNCTION__, __LINE__, args)
+#define HEPTA_ERROR_PRINT(fmt) printf("%s:%s:%d: error :"fmt, __FILE__, __FUNCTION__, __LINE__)
+
+#define HEPTA_GET_NUM_RESOURCE _IOR('b',0,hepta_u32 *)
+#define HEPTA_GET_RESOURCES _IOR('b',1,hepta_mem_map_resource *)
+#define HEPTA_SET_REGISTERS _IOW('b',2,RdWrParameter *)
+#define HEPTA_GET_REGISTERS  _IOR('b',3,RdWrParameter *)
+#define HEPTA_SET_FIFO _IOW('b',4,RdWrParameter *)
+#define HEPTA_GET_FIFO _IOR('b',5,RdWrParameter *)
+#define HEPTA_GET_DDR3_PHYSICAL _IOR('b',6,RdWrParameter *)
+#define HEPTA_TRANSFER_HPS_FPGA _IOW('b',7,RdWrParameter *)
+#define HEPTA_TRANSFER_FPGA_HPS _IOW('b',8,RdWrParameter *)
+#define HEPTA_PRINT_DMA_MEMORY _IOW('b',9,RdWrParameter *)
+#define HEPTA_INTERRUPT _IOR('b',10,hepta_u32 *)
+#define HEPTA_INTERRUPT_LOCK _IOR('b',11,hepta_u32 *)
+#define HEPTA_INTERRUPT_UNLOCK _IOR('b',12,hepta_u32 *)
+#define HEPTA_INTERRUPT_ENABLE _IOR('b',13,hepta_u32 *)
+#define HEPTA_INTERRUPT_DISABLE _IOR('b',14,hepta_u32 *)
+
+#define MAX_DEVICE_INSTANCE 8
+
+#define REGISTER_SIZE_16	2
+#define REGISTER_SIZE_32	4
+#define REGISTER_SIZE_64	8
+
+
+#define DDR_PATTERN_START_ADDRESS 0xc0000000
+#define DDR_CAPTURE_START_ADDRESS 0xd0000000
+
+
+#define PATTERN_DDR3_SIZE ((128*1024*1024)>>2)
+#define CAPTURE_DDR3_SIZE ((128*1024*1024)>>2)
+
+
+/* define */
+#define CLIENT_CONNECTION               1      /* Firmware will establish connection with server*/
+#define FIRMWARE_PERFORMANCE_DEBUGGING  1	   /* some debugging messages will be enabled */
+
+//#define DPD_Rev_int_buffer 1
+
+
+#define HEPTA_BIT_ENABLE(x) (0x1<<x)
+#define HEPTA_BIT_DISABLE(x) ~(0x1<<x)
+
+#define RESERVED_MEM 0x20000000
+#define RESERVED_MEM_SIZE (0x1<<29)
+#define INTR_RESOURCE_COUNT 32
+typedef void(*pIntrCallback)(void *context, hepta_status status);
+
+typedef void (*command_response)(phepta_cmd_pck_header pCmdHeader,hepta_u16 packet_id);
+
+
+/**
+* @ingroup Interrupt_Handler
+* @brief Callback database and callback paramater structure.
+*/
+
+
+typedef struct
+{
+	pIntrCallback callback[INTR_RESOURCE_COUNT]; 	/**< Array of function pointers */
+	void *callback_param[INTR_RESOURCE_COUNT]; 		/**< Array of parameters that should be passed to callback functions */
+}__attribute__((__packed__))callback_db;
+
+
+/**
+* @ingroup Interrupt_Handler
+* @brief Interrupt handler structure.
+*/
+
+
+
+typedef struct {
+	pthread_mutex_t lock;					/**< Lock to synchronise interrupt management*/
+	pthread_t intr_thrd_handle;				/**< Interrupt handler thread handle */
+	int intr_flag;							/**< Interrupt flag */
+	callback_db db;							/**< Callback function pointer database. Array of function pointers and parameters */
+	hepta_u32 intr_mask;					/**< Interrupt mask description*/
+}__attribute__((__packed__))interrupt_handle, intr_dev;
+
+
+/**
+* @ingroup HandleManager
+* @brief Hepta device handler structure.
+*/
+
+typedef struct{
+	unsigned int 			irq;						/**< IRQ for the device. */
+	unsigned int 			dev_file_handler;			/**< File handler for the opened device node. */
+	hepta_module_type 		dev_type;					/**< Module type. */
+	phepta_bus_address 		reg_phy_addr; 				/**< Physical address for Register Bank */
+	phepta_bus_address 		reg_remap_addr; 			/**< Virtual address of Register Bank */
+	phepta_bus_address		*pbuffer_phy_addr;			/**< Array of physical address for resources. */
+	phepta_bus_address		*pbuffer_remap_addr;		/**< Array of virtual address for resources. */
+	hepta_handler 			Service_ptr;				/**< Pointer to the service database. */
+	interrupt_handle 		dev_interrupt_handle;		/**< Interrupt device. */
+	hepta_handler			private_data;  				/**< Private data for device. DPD Algorithm control */
+	pthread_cond_t	   		condition_signal; 			/**< Condition to signal the read/write threads*/
+	pthread_mutex_t    		lock; 						/**< Lock to synchronise the access to the fields in the scheduler header*/
+	char 					*dev_name; 					/**< Device node path and name as a string. */
+}hepta_device_handler, *phepta_device_handler;
+
+/**
+* @ingroup HandleManager
+* @brief Parameter to exchange information of the resources from driver to the user space.
+*/
+
+typedef struct
+{
+	phepta_bus_address start_address; /**< Base address of the resource. */
+	hepta_u32 size_in_bytes; /**< Size of the resource in bytes. */
+}__attribute__((__packed__))hepta_mem_map_resource;
+
+
+
+
+#ifdef __cplusplus  
+}
+#endif 
+#endif //end of ifndef HEPTA_FIRMWARE_H

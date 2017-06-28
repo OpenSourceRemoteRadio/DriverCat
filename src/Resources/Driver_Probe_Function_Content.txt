@@ -1,0 +1,23 @@
+unsigned int current_irq = 0;
+unsigned int num_of_bytes_written ;
+interrupt_signal_info * current_instance_interrupt_signal_info_ptr;
+unsigned int module_char_name_size;
+	
+module_char_name_size = sizeof(DRIVER_MODULE_NAME)+2;
+module_char_name = kmalloc(module_char_name_size,GFP_KERNEL);
+num_of_bytes_written = snprintf(module_char_name,module_char_name_size-2,"%s",DRIVER_MODULE_NAME);
+num_of_bytes_written = snprintf(module_char_name+num_of_bytes_written,3,"%2d",*module_count_ptr);
+printk(KERN_INFO "%s : Platform probe\n",module_char_name);
+	
+interrupt_signal_info_ptr[*module_count_ptr] = kmalloc((sizeof(interrupt_signal_info) * number_of_irqs[*module_count_ptr]),GFP_KERNEL);
+current_instance_interrupt_signal_info_ptr = interrupt_signal_info_ptr[*module_count_ptr];
+	
+for(current_irq=0;current_irq <number_of_irqs[*module_count_ptr] ; current_irq++)
+{
+	current_instance_interrupt_signal_info_ptr[current_irq].signal_number = interrupt_signal_numbers[*module_count_ptr];
+	current_instance_interrupt_signal_info_ptr[current_irq].signal_data = current_irq;
+}
+	
+driver_platform_probe(pdev,device_proc_dir_ptr,module_char_name,*module_count_ptr,interrupt_signal_info_ptr,number_of_irqs[*module_count_ptr]);
+*module_count_ptr = *module_count_ptr + 1;
+return 0;

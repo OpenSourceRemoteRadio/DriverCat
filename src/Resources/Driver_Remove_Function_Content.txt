@@ -1,0 +1,6 @@
+int current_instance = 0;
+current_instance = driver_platform_remove(pdev,device_proc_dir_ptr,interrupt_signal_info_ptr,number_of_irqs);
+printk(KERN_INFO "%s : Platform remove instance %d\n",DRIVER_MODULE_NAME,current_instance);
+kfree(interrupt_signal_info_ptr[current_instance]);
+*module_count_ptr=*module_count_ptr-1;
+return 0;

@@ -1,0 +1,680 @@
+#define FIRST_MINOR 0
+#define MODULE_COUNT 1
+
+typedef volatile unsigned int * BusAddr;
+
+typedef struct
+{
+	BusAddr start_address;
+	unsigned int size_in_bytes;
+}__attribute__((__packed__))Physical_resource;
+
+
+typedef struct
+{
+	unsigned int signal_number;
+	int user_application_pid;
+	unsigned int signal_data;
+}__attribute__((__packed__))interrupt_signal_info;
+
+
+
+int read_num_proc(struct file *filp,char *buf,size_t count,loff_t *offp );
+int driver_platform_probe(struct platform_device *pdev,struct proc_dir_entry * device_proc_dir_ptr,char *module_char_name,unsigned int module_instance_number,interrupt_signal_info ** interrupt_signal_info_ptr_array,unsigned int number_of_irq);
+int driver_platform_remove(struct platform_device *pdev,struct proc_dir_entry * device_proc_dir_ptr,interrupt_signal_info ** interrupt_signal_info_ptr_array,unsigned int * number_of_irq_array);
+int resource_proc_write(struct file *filp,const char *buf,size_t count,loff_t *offp);
+int resource_proc_read(struct file *filp,char *buf,size_t count,loff_t *offp ) ;
+int char_device_open(struct inode *inode,struct file *filp);
+int char_device_mmap(struct file *filp, struct vm_area_struct *vma);
+long char_device_ioctl(struct file *filp,unsigned int cmd,unsigned long input);
+int char_device_release(struct inode *inode,struct file *filp);
+irqreturn_t device_irq_handler(int irq, void *data);
+irqreturn_t device_uio_irq_handler(int irq, struct uio_info *dev_info);
+void device_vma_open(struct vm_area_struct *vma);
+void device_vma_close(struct vm_area_struct *vma);
+static int device_vma_fault(struct vm_area_struct *vma, struct vm_fault *vmf);
+int uio_open(struct uio_info *info, struct inode *inode);
+int uio_release(struct uio_info *info, struct inode *inode);
+
+#define IOCTL_GET_NUM_RESOURCE _IOR('b',0,unsigned int *)
+#define IOCTL_GET_RESOURCES _IOR('b',1,Physical_resource *)
+#define IOCTL_SET_PID _IOW('b',2,unsigned int *)
+#define IOCTL_GET_NUM_INTERRUPT _IOR('b',3,unsigned int *)
+#define IOCTL_GET_UIO_MINOR_NUMBER _IOR('b',4,int *)
+
+
+/**
+ * @brief device instance structure. This structure represents each device instance instance.
+ * */
+
+
+struct device_instance_structure
+{
+	struct cdev char_dev;		/**< Character device structure for device. Provides IOCTL,OPEN,CLOSE and MMAP interface */
+	struct platform_device *platform_device_ptr; /**< Pointer to the device platform device structure. Allocated for each instance discovered in kernel */
+	struct proc_dir_entry *instance_proc_ptr;	/**< Pointer to the device proc directory. Pointer represents /proc/<device_name>/<instance_num> directory */
+	unsigned int num_of_resource;					/**< Number of device instances found in kernel device tree */
+	BusAddr *resource_physical_address;	/**< device resource physical address as extracted from device tree node */
+	BusAddr *resource_remap_address;		/**< device resource remapped address as extracted from device tree node */
+	struct proc_dir_entry ** resource_proc_ptr;
+	dev_t device_number;						/**< Device number allocated to device character device */
+	unsigned int instance_number;				/**< Instance number of the current device device */
+	interrupt_signal_info *interrupt_signal_info_ptr;
+	int number_of_interrupts;
+	int user_application_pid;
+	char *module_char_name;
+	struct uio_info * device_uio_info;
+}__attribute__((__packed__));
+
+
+
+struct file_operations proc_resource_fops = {
+.read  =   resource_proc_read,
+.write = resource_proc_write,
+};
+
+
+/**
+ * @brief character mmap operation structure. This structure holds function pointers for system mmap calls.
+ * */
+
+
+static struct vm_operations_struct device_remap_vm_ops =
+{
+    .open =  device_vma_open,	/**< Function pointer for device mmap open */
+    .close = device_vma_close,	/**< Function pointer for device mmap close */
+	.fault = device_vma_fault,
+};
+
+
+/**
+ * @brief character file operation structure. This structure holds function pointers for system mmap calls.
+ * */
+
+
+static struct file_operations char_device_fops =
+{
+    .owner = THIS_MODULE,					
+    .open = char_device_open,			/**< Function pointer for device character device open system call */
+	.mmap = char_device_mmap,			/**< Function pointer for device character device mmap system call */
+ 	#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,35))
+    .ioctl = char_device_ioctl,		/**< Function pointer for device character device ioctl system call */
+	#else
+    .unlocked_ioctl = char_device_ioctl,	/**< Function pointer for device character device ioctl system call */
+	#endif
+    .release = char_device_release,		/**< Function pointer for device character device close system call */
+    .llseek = NULL,
+};
+
+
+/**
+ * @brief device interrupt handler. Signals the user space.
+ * */
+
+
+irqreturn_t device_irq_handler(int irq, void *data)
+{
+	struct siginfo info;
+	struct task_struct *t;
+	int ret;
+	interrupt_signal_info *interrupt_signal_info_ptr=(interrupt_signal_info *)data;
+    
+	if(interrupt_signal_info_ptr)
+	{
+		printk(KERN_INFO "IRQ %d : ISR is called\n",irq);
+		/* send the signal */
+		memset(&info, 0, sizeof(struct siginfo));
+		info.si_signo = interrupt_signal_info_ptr->signal_number;
+		info.si_code = SI_QUEUE;	
+		info.si_int = interrupt_signal_info_ptr->signal_data;  		
+
+		t = pid_task(find_pid_ns(interrupt_signal_info_ptr->user_application_pid, &init_pid_ns), PIDTYPE_PID);	
+		if(t == NULL)
+		{
+			printk(KERN_ERR "IRQ %d : No process with pid %d\n",irq,interrupt_signal_info_ptr->user_application_pid);
+			return IRQ_HANDLED;
+		}
+		ret = send_sig_info(interrupt_signal_info_ptr->signal_number, &info, t);    //send the signal
+		if (ret < 0) 
+		{
+			printk(KERN_ERR "IRQ %d : Error sending signal to pid %d\n",irq,interrupt_signal_info_ptr->user_application_pid);
+			return IRQ_HANDLED;
+		}
+	}
+	else
+	{
+		printk(KERN_INFO "%d : error sending signal\n",irq);
+	}
+	
+	return IRQ_HANDLED;
+}
+
+irqreturn_t device_uio_irq_handler(int irq, struct uio_info *dev_info)
+{
+	return IRQ_HANDLED;
+}
+
+
+
+int driver_platform_probe(struct platform_device *pdev,struct proc_dir_entry * device_proc_dir_ptr,char *module_char_name,unsigned int module_instance_number,interrupt_signal_info ** interrupt_signal_info_ptr_array,unsigned int number_of_irq)
+{
+	struct device_instance_structure *device_instance_structure_ptr;
+	unsigned int resource_num;
+	struct resource *resource_ptr;
+	unsigned int result_int;
+	dev_t dev_no;
+	void *mem_request=NULL;
+	unsigned int irq=0;
+	unsigned int current_irq_index = 0;
+	interrupt_signal_info * current_instance_interrupt_signal_info_ptr;
+	char instance_proc_name[3];
+	char resource_proc_name[9];
+	int mmap_index;
+	struct uio_device * uio_device_ptr;
+	struct uio_info * device_uio_info_ptr = kmalloc(sizeof(struct uio_info),GFP_KERNEL);
+
+	device_instance_structure_ptr=(struct device_instance_structure *)kmalloc(sizeof(struct device_instance_structure),GFP_KERNEL);
+	platform_set_drvdata(pdev,device_instance_structure_ptr);
+	device_instance_structure_ptr->instance_number = module_instance_number;
+	device_instance_structure_ptr->module_char_name = module_char_name;
+	
+	
+	snprintf(instance_proc_name,3, "%2d", device_instance_structure_ptr->instance_number);
+	device_instance_structure_ptr->instance_proc_ptr =proc_mkdir(instance_proc_name,device_proc_dir_ptr);
+
+	device_instance_structure_ptr->resource_physical_address=kmalloc((sizeof(BusAddr) * pdev->num_resources),GFP_KERNEL);
+	device_instance_structure_ptr->resource_remap_address=kmalloc((sizeof(BusAddr) * pdev->num_resources),GFP_KERNEL);
+	device_instance_structure_ptr->resource_proc_ptr = kmalloc((sizeof(struct proc_dir_entry *) * pdev->num_resources),GFP_KERNEL);
+	
+	device_instance_structure_ptr->num_of_resource = 0;
+	for(resource_num=0;resource_num < (pdev->num_resources);resource_num++)
+	{
+		resource_ptr=platform_get_resource(pdev,IORESOURCE_MEM,resource_num);
+		if(resource_ptr!=NULL)
+		{
+			printk(KERN_INFO "%s : Count= %d Name %s Start 0x%X End 0x%X\n",module_char_name,resource_num,resource_ptr->name,(unsigned int)resource_ptr->start,(unsigned int)resource_ptr->end);
+			mem_request=request_mem_region(resource_ptr->start,(resource_ptr->end-resource_ptr->start)+1,resource_ptr->name/* module_char_name*/);
+			if(mem_request==NULL)
+			{
+				printk(KERN_ERR  "%s : IO memory cannot be allocated resource %s \n",module_char_name,resource_ptr->name);
+				printk(KERN_INFO "%s : Exiting Platform Driver Probe\n",module_char_name);
+				return 0;
+			}
+			device_instance_structure_ptr->resource_physical_address[resource_num] = (BusAddr) resource_ptr->start;
+			device_instance_structure_ptr->resource_remap_address[resource_num] = (BusAddr) ioremap(resource_ptr->start,(resource_ptr->end-resource_ptr->start)+1);
+			snprintf(resource_proc_name,9, "%X",(unsigned int) resource_ptr->start);
+			device_instance_structure_ptr->resource_proc_ptr[resource_num] = proc_create_data(resource_proc_name,0,device_instance_structure_ptr->instance_proc_ptr,&proc_resource_fops,(device_instance_structure_ptr->resource_remap_address + resource_num));
+
+			if(device_instance_structure_ptr->num_of_resource < MAX_UIO_MAPS)
+			{
+				device_uio_info_ptr->mem[device_instance_structure_ptr->num_of_resource].memtype = UIO_MEM_PHYS;
+				device_uio_info_ptr->mem[device_instance_structure_ptr->num_of_resource].addr = resource_ptr->start;
+				device_uio_info_ptr->mem[device_instance_structure_ptr->num_of_resource].size = (resource_ptr->end-resource_ptr->start)+1;
+				device_uio_info_ptr->mem[device_instance_structure_ptr->num_of_resource].name = kmalloc(strlen(resource_ptr->name)+1,GFP_KERNEL);
+				strcpy(device_uio_info_ptr->mem[device_instance_structure_ptr->num_of_resource].name,resource_ptr->name);
+				//device_instance_structure_ptr->device_uio_info_ptr->mem[0].internal_addr = device_instance_structure_ptr->resource_remap_address[resource_num];
+			}
+			
+			device_instance_structure_ptr->num_of_resource++;
+		}
+	}
+
+	for (mmap_index = device_instance_structure_ptr->num_of_resource; mmap_index < MAX_UIO_MAPS; mmap_index++)
+	{
+		device_uio_info_ptr->mem[mmap_index].size = 0;
+	}
+
+	result_int = alloc_chrdev_region(&device_instance_structure_ptr->device_number,FIRST_MINOR,MODULE_COUNT,module_char_name);
+	if(result_int < 0)
+    {
+		printk(KERN_INFO "%s : Can't get a major number\n",module_char_name);
+		printk(KERN_INFO "%s : Exiting Platform Driver Probe\n",module_char_name);
+		return 0;
+    }
+
+	printk(KERN_INFO "%s : Char driver registered successfully with %d major number\n",module_char_name,MAJOR(device_instance_structure_ptr->device_number));
+
+	dev_no = MKDEV(MAJOR(device_instance_structure_ptr->device_number),MINOR(device_instance_structure_ptr->device_number)+0);
+	
+    cdev_init(&device_instance_structure_ptr->char_dev,&char_device_fops);
+   	device_instance_structure_ptr->char_dev.owner = THIS_MODULE;
+   	device_instance_structure_ptr->char_dev.ops = &char_device_fops;
+	device_instance_structure_ptr->platform_device_ptr=pdev;					// stores the pdev structure
+	
+	cdev_add(&device_instance_structure_ptr->char_dev,dev_no,MODULE_COUNT);
+	printk(KERN_INFO "%s : Character device added successfully\n",module_char_name);
+	
+	current_instance_interrupt_signal_info_ptr = interrupt_signal_info_ptr_array[module_instance_number];
+	device_instance_structure_ptr->interrupt_signal_info_ptr = current_instance_interrupt_signal_info_ptr;
+	device_instance_structure_ptr->number_of_interrupts = number_of_irq;
+
+	if(number_of_irq > 0)
+	{
+		for(current_irq_index=0;current_irq_index<number_of_irq;current_irq_index++)
+		{
+			irq = platform_get_irq(pdev,current_irq_index);
+			if(irq >= 0)
+			{
+				#if 0
+				printk(KERN_INFO "%s : IRQ No %d \n",module_char_name,irq);
+				result_int = request_irq(irq, device_irq_handler, (unsigned long) 0, module_char_name, (void *) current_instance_interrupt_signal_info_ptr+current_irq_index);
+				if(result_int)
+				{
+					printk(KERN_INFO "%s : IRQ %d Registration failed \n",module_char_name,irq);
+				}
+				else
+				{
+					printk(KERN_INFO "%s : IRQ %d Registration passed\n",module_char_name,irq);
+				}
+				#endif
+
+				device_uio_info_ptr->irq = irq;
+				device_uio_info_ptr->handler = device_uio_irq_handler;
+				device_uio_info_ptr->priv = (void *) current_instance_interrupt_signal_info_ptr+current_irq_index;
+				device_uio_info_ptr->irq_flags = 0;
+			}
+			else
+			{
+				number_of_irq = 0;
+			}
+		}
+	}
+
+	if(number_of_irq == 0)
+	{
+		device_uio_info_ptr->irq = UIO_IRQ_CUSTOM;
+		device_uio_info_ptr->irq_flags = 0;
+	}
+	
+	device_uio_info_ptr->name =  module_char_name,
+	device_uio_info_ptr->version = "0.1",
+	device_uio_info_ptr->open = uio_open;
+	device_uio_info_ptr->release = uio_release;
+
+
+	result_int = uio_register_device(&(pdev->dev), device_uio_info_ptr);
+	if(result_int == 0)
+	{		
+		device_instance_structure_ptr->device_uio_info = device_uio_info_ptr;
+		printk(KERN_INFO "%s : UIO Registration passed %d\n",module_char_name,result_int);
+		uio_device_ptr = device_uio_info_ptr->uio_dev;
+		if(uio_device_ptr != NULL)
+		{
+			printk(KERN_INFO "%s : UIO Registration passed %d Minor %d\n",module_char_name,result_int,  uio_device_ptr->minor  );
+		}
+	}
+	else
+	{
+		device_instance_structure_ptr->device_uio_info = NULL;
+		printk(KERN_INFO "%s : UIO Registration failed %d\n",module_char_name,result_int);
+	}
+
+
+	printk(KERN_INFO "%s : Exiting probe\n",module_char_name);
+	
+	return 0;
+}
+
+
+/**
+ * @brief device character device file open function. Called when /dev/<device_name><instance_number> device file is opened in user space.
+ * */
+
+
+
+int char_device_open(struct inode *inode,struct file *filp)
+{
+	struct device_instance_structure *device_instance_structure_ptr;
+	device_instance_structure_ptr = container_of(inode->i_cdev,struct device_instance_structure,char_dev);
+	printk(KERN_INFO "%s : Char open\n",device_instance_structure_ptr->module_char_name);
+	filp->private_data = device_instance_structure_ptr;
+	return 0;
+}
+
+
+int uio_open(struct uio_info *info, struct inode *inode)
+{
+	if(info!=NULL)
+	{
+		printk(KERN_INFO "%s : UIO open\n",info->name);
+	}
+	return 0;
+}
+
+
+int uio_release(struct uio_info *info, struct inode *inode)
+{
+	if(info!=NULL)
+	{
+		printk(KERN_INFO "%s : UIO release\n",info->name);
+	}
+	return 0;
+}
+
+
+
+/**
+ * @brief device character device file mmap function. Called when /dev/<device_name><instance_number> device file is mmaped in user space.
+ * */
+
+
+int char_device_mmap(struct file *filp, struct vm_area_struct *vma)
+{
+	struct device_instance_structure *device_instance_structure_ptr;
+	device_instance_structure_ptr=filp->private_data;
+	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
+	//vma->vm_flags |= (VM_DONTEXPAND | VM_DONTDUMP);
+	#if 1
+	if (remap_pfn_range(vma, vma->vm_start, vma->vm_pgoff,
+                vma->vm_end - vma->vm_start,
+                vma->vm_page_prot))
+        return -EAGAIN;
+	#endif
+	#if 0
+		//if (io_remap_pfn_range(vma, vma->vm_start, vma->vm_pgoff << PAGE_SHIFT, vma->vm_end - vma->vm_start, vma->vm_page_prot))
+			if (io_remap_pfn_range(vma, vma->vm_start, vma->vm_pgoff, vma->vm_end - vma->vm_start, vma->vm_page_prot))
+			return -EAGAIN;
+	#endif
+    vma->vm_ops = &device_remap_vm_ops;
+	vma->vm_private_data = filp->private_data;
+	device_vma_open(vma);
+	return 0;
+}
+
+
+void device_vma_open(struct vm_area_struct *vma)
+{
+	struct device_instance_structure *device_instance_structure_ptr;
+	device_instance_structure_ptr=vma->vm_private_data ;
+	printk(KERN_NOTICE "%s : VMA virt %lx, phys %lx\n",device_instance_structure_ptr->module_char_name,vma->vm_start, vma->vm_pgoff << PAGE_SHIFT);
+}
+
+void device_vma_close(struct vm_area_struct *vma)
+{
+	struct device_instance_structure *device_instance_structure_ptr;
+	device_instance_structure_ptr=vma->vm_private_data ;
+	printk(KERN_NOTICE "%s : VMA Close\n",device_instance_structure_ptr->module_char_name);
+}
+
+
+static int device_vma_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
+{
+	struct page *page;	
+	struct device_instance_structure *device_instance_structure_ptr;
+	device_instance_structure_ptr=vma->vm_private_data ;
+	printk(KERN_NOTICE "%s : VMA Fault\n",device_instance_structure_ptr->module_char_name);
+	
+	/* get the page */
+	page = virt_to_page(get_zeroed_page(GFP_KERNEL));
+	
+	/* increment the reference count of this page */
+	get_page(page);
+	vmf->page = page;		
+	return 0;
+}
+
+
+/**
+ * @brief device character device file ioctl function. Called when /dev/<device_name><instance_number> device file is ioctl in user space. This function transfers resource information to user space when IOCTL_GET_NUM_RESOURCE and IOCTL_GET_RESOURCES command is called from user space.
+ * */
+
+
+long char_device_ioctl(struct file *filp,unsigned int cmd,unsigned long input)
+{
+	Physical_resource *physical_resources_ptr;
+	void *send_ptr;
+	unsigned int rdwr_count,copied_byte,num_of_resource;
+	struct platform_device *platform_device_ptr;
+	struct device_instance_structure *device_instance_structure_ptr;
+	unsigned int * num_of_resource_ptr , *num_of_interrupt_ptr;
+	struct resource *resource_ptr;
+	unsigned int pid;
+	int * uio_minor_number_ptr;
+	struct uio_info * device_uio_info_ptr;
+	struct uio_device * uio_device_ptr;
+
+	device_instance_structure_ptr=filp->private_data;
+	printk(KERN_INFO "%s : Char IOCTL\n",device_instance_structure_ptr->module_char_name);
+	platform_device_ptr=device_instance_structure_ptr->platform_device_ptr;
+	device_uio_info_ptr = device_instance_structure_ptr->device_uio_info;
+
+	switch(cmd)
+	{
+		case IOCTL_GET_NUM_RESOURCE:
+			num_of_resource_ptr=kmalloc((sizeof(unsigned int)),GFP_KERNEL);
+			*num_of_resource_ptr=(device_instance_structure_ptr->num_of_resource);
+			printk(KERN_INFO "%s : Number of resources = %d\n",device_instance_structure_ptr->module_char_name,*num_of_resource_ptr);
+			copied_byte=copy_to_user((unsigned int *)input,num_of_resource_ptr,(sizeof(unsigned int)));
+			kfree(num_of_resource_ptr);
+			break;
+		case IOCTL_GET_RESOURCES:
+			send_ptr=kmalloc((sizeof(Physical_resource)*device_instance_structure_ptr->num_of_resource),GFP_KERNEL);
+			physical_resources_ptr=(Physical_resource *)send_ptr;
+			num_of_resource = 0;
+			for(rdwr_count=0;rdwr_count< (platform_device_ptr->num_resources);rdwr_count++)
+			{
+				resource_ptr=platform_get_resource(platform_device_ptr,IORESOURCE_MEM,rdwr_count);
+				if(resource_ptr!=NULL)
+				{				
+					(physical_resources_ptr+num_of_resource)->start_address=*((device_instance_structure_ptr->resource_physical_address)+rdwr_count);
+					(physical_resources_ptr+num_of_resource)->size_in_bytes=(resource_ptr->end-resource_ptr->start)+1;
+					num_of_resource++;
+				}
+			}	
+			copied_byte=copy_to_user((Physical_resource *)input,send_ptr,(sizeof(Physical_resource)*device_instance_structure_ptr->num_of_resource));
+			kfree(send_ptr);
+			break;
+		case IOCTL_SET_PID:
+			copied_byte=copy_from_user(&pid,(unsigned int *)input,sizeof(unsigned int));
+			printk(KERN_INFO "%s : PID %d\n",device_instance_structure_ptr->module_char_name,pid);
+			device_instance_structure_ptr->user_application_pid=pid;
+			
+			for(rdwr_count=0;rdwr_count< (device_instance_structure_ptr->number_of_interrupts);rdwr_count++)
+			{
+				device_instance_structure_ptr->interrupt_signal_info_ptr[rdwr_count].user_application_pid = pid;
+			}
+			break;
+		case IOCTL_GET_NUM_INTERRUPT:
+			num_of_interrupt_ptr=kmalloc((sizeof(unsigned int)),GFP_KERNEL);
+			*num_of_interrupt_ptr=(device_instance_structure_ptr->number_of_interrupts);
+			printk(KERN_INFO "%s : Number of interrupts = %d\n",device_instance_structure_ptr->module_char_name,*num_of_interrupt_ptr);
+			copied_byte=copy_to_user((unsigned int *)input,num_of_interrupt_ptr,(sizeof(unsigned int)));
+			kfree(num_of_interrupt_ptr);
+			break;
+		case IOCTL_GET_UIO_MINOR_NUMBER:
+			uio_minor_number_ptr=kmalloc((sizeof(int)),GFP_KERNEL);
+			*uio_minor_number_ptr = -1;
+			if(device_uio_info_ptr != NULL)
+			{
+				uio_device_ptr = device_uio_info_ptr->uio_dev;
+				if(uio_device_ptr != NULL)
+				{
+					*uio_minor_number_ptr=uio_device_ptr->minor;
+				}
+			}
+			
+			printk(KERN_INFO "%s : UIO Minor number = %d\n",device_instance_structure_ptr->module_char_name,*uio_minor_number_ptr);
+			copied_byte=copy_to_user((unsigned int *)input,uio_minor_number_ptr,(sizeof(int)));
+			kfree(uio_minor_number_ptr);
+			break;
+		default:
+			printk(KERN_INFO "%s : Unknown IOCTL\n",device_instance_structure_ptr->module_char_name);
+	}
+	return 0;
+}
+
+
+/**
+ * @brief device character device file close function. Called when /dev/<device_name><instance_number> device file is closed in user space.
+ * */
+
+
+int char_device_release(struct inode *inode,struct file *filp)
+{
+	return 0;
+}
+
+
+int driver_platform_remove(struct platform_device *pdev,struct proc_dir_entry * device_proc_dir_ptr,interrupt_signal_info ** interrupt_signal_info_ptr_array,unsigned int * number_of_irq_array)
+{
+	struct device_instance_structure *device_instance_structure_ptr;
+	struct resource *resource_ptr;
+	unsigned int resource_num;
+	int current_instance_number;
+	unsigned int current_irq_index;
+	interrupt_signal_info * current_instance_interrupt_signal_info_ptr;
+	int irq;
+	char instance_proc_name[3];
+	char resource_proc_name[9];
+
+	device_instance_structure_ptr=(struct device_instance_structure *)platform_get_drvdata(pdev);
+	printk("%s : Platform remove\n",device_instance_structure_ptr->module_char_name);
+	current_instance_number = device_instance_structure_ptr->instance_number;
+
+	if(device_instance_structure_ptr->device_uio_info != NULL)
+	{
+		uio_unregister_device(device_instance_structure_ptr->device_uio_info);
+	}
+
+	unregister_chrdev_region(device_instance_structure_ptr->device_number,MODULE_COUNT);
+    cdev_del(&(device_instance_structure_ptr->char_dev));
+	
+	for(resource_num=0;resource_num < (pdev->num_resources);resource_num++)
+	{
+		resource_ptr=platform_get_resource(pdev,IORESOURCE_MEM,resource_num);
+		if(resource_ptr!=NULL)
+		{
+			release_mem_region(resource_ptr->start,(resource_ptr->end-resource_ptr->start)+1);
+			iounmap(*(device_instance_structure_ptr->resource_remap_address + resource_num));
+			snprintf(resource_proc_name,9, "%X",(unsigned int) resource_ptr->start);
+			remove_proc_entry(resource_proc_name,device_instance_structure_ptr->instance_proc_ptr);
+		}
+	}
+		
+	kfree(device_instance_structure_ptr->resource_physical_address);
+	kfree(device_instance_structure_ptr->resource_remap_address);
+	kfree(device_instance_structure_ptr->resource_proc_ptr);
+	
+	snprintf(instance_proc_name,3, "%2d", device_instance_structure_ptr->instance_number);
+	remove_proc_entry(instance_proc_name,device_proc_dir_ptr);
+	
+	current_instance_interrupt_signal_info_ptr = interrupt_signal_info_ptr_array[current_instance_number];
+
+	#if 0
+	for(current_irq_index=0;current_irq_index < (number_of_irq_array[current_instance_number]);current_irq_index++)
+	{
+		irq = platform_get_irq(pdev,current_irq_index);
+		if(irq >= 0)
+		{
+			printk(KERN_INFO "%s : IRQ No %d \n",device_instance_structure_ptr->module_char_name,irq);
+			free_irq(irq, current_instance_interrupt_signal_info_ptr+current_irq_index);
+		}
+	}
+	#endif
+	
+	kfree(device_instance_structure_ptr);
+	
+	
+	return current_instance_number;
+}
+
+
+
+
+
+
+struct file_operations proc_num_of_instance_fops = {
+.read  =   read_num_proc,
+};
+
+
+
+ /**
+ * @brief device instance proc read fucntion. Called when /proc/<device_name>/num_of_instance file is read.
+ * */
+
+
+int read_num_proc(struct file *filp,char *buf,size_t count,loff_t *offp ) 
+{
+	char *data;
+	unsigned int * module_instance_count_ptr; 
+	
+	data=PDE_DATA(file_inode(filp));
+	
+	if(!(data))
+	{
+		printk(KERN_INFO "Null data at num of instance read");
+		return 0;
+	}
+	module_instance_count_ptr= (unsigned int *) data;
+    sprintf(buf,"%d\n",*module_instance_count_ptr);
+	*offp = *offp + count;
+	printk(KERN_INFO "Number of instances : %d\n",*module_instance_count_ptr);
+    return 0;
+}
+
+
+int resource_proc_read(struct file *filp,char *buf,size_t count,loff_t *offp ) 
+{
+	unsigned int register_data;
+	char *data;
+	BusAddr *device_remap_addr_ptr;
+	BusAddr device_remap_addr;
+	unsigned int copied_byte;
+	unsigned int read_index = 0;
+	
+	printk("Number of data requested %d from offset %d\n",count,(unsigned int) *offp);
+	data=PDE_DATA(file_inode(filp));
+	
+	if(!(data))
+	{
+		printk(KERN_INFO "Null data at register proc write");
+		return 0;
+	}
+	
+	device_remap_addr_ptr=(BusAddr *) data;
+	device_remap_addr=*device_remap_addr_ptr;
+	
+	for(read_index=0;read_index < (count/4) ; read_index++)
+	{
+		register_data = readl(device_remap_addr+read_index + ((*offp)/4));
+		copied_byte = copy_to_user(buf,&register_data,4);
+		printk(KERN_NOTICE "Offset %d : Data %X\n",read_index + (unsigned int) ((*offp)/4),register_data);
+		*offp = *offp+4;
+	}
+	
+	return count;
+}
+
+
+int resource_proc_write(struct file *filp,const char *buf,size_t count,loff_t *offp)
+{
+	unsigned int register_data;
+    unsigned int register_address;
+	char * receive_buffer;
+	char *data;
+	BusAddr *device_remap_addr_ptr;
+	BusAddr device_remap_addr;
+	
+	data=PDE_DATA(file_inode(filp));
+	
+	if(!(data))
+	{
+		printk(KERN_INFO "Null data at register proc write");
+		return 0;
+	}
+	
+	device_remap_addr_ptr=(BusAddr *) data;
+	device_remap_addr=*device_remap_addr_ptr;
+	
+	receive_buffer = kmalloc(sizeof(char)*count,GFP_KERNEL);
+
+    if(copy_from_user(receive_buffer,buf,count))
+      return -EFAULT;
+
+    sscanf(receive_buffer,"%d %d",&register_address,&register_data);
+	printk(KERN_NOTICE "Writing %d in register at %d offset\n",register_data,register_address);
+	writel(register_data,(BusAddr)(device_remap_addr+register_address));
+	kfree(receive_buffer);
+	return count;
+}
